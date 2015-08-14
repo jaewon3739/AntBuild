@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="CustomRules">
+	<property name="ant_lib_path" value="ant_lib" />
+	<property name="ant_apk_path" value="ant_apk" />
+	<property name="ant_packagename" value="com.example.antbuild" />
+	
+	
+	<!-- Package Name 변경 -->
+     <target
+        name="-package-resources" depends="-crunch" >
+
+        <do-only-if-not-library elseText="Library project: do not package resources..." >
+
+            <aapt
+                androidjar="${project.target.android.jar}"
+                apkfolder="${out.absolute.dir}"
+                assets="${asset.absolute.dir}"
+                buildType="${build.target}"
+                command="package"
+                debug="${build.is.packaging.debug}"
+                executable="${aapt}"
+                ignoreAssets="${aapt.ignore.assets}"
+                libraryPackagesRefid="project.library.packages"
+                libraryRFileRefid="project.library.bin.r.file.path"
+                libraryResFolderPathRefid="project.library.res.folder.path"
+                manifest="${out.manifest.abs.file}"
+                manifestpackage="${ant_packagename}"
+                nocrunch="${build.packaging.nocrunch}"
+                previousBuildType="${build.last.target}"
+                resourcefilename="${resource.package.file.name}"
+                resourcefilter="${aapt.resource.filter}" >
+
+                <res path="${out.res.absolute.dir}" />
+
+                <res path="${resource.absolute.dir}" /> 
+            </aapt>
+        </do-only-if-not-library>
+    </target>
+	
+	<!-- Release apk 생성-->
+	<target name="-set-release-mode" depends="-set-mode-check">
+		<mkdir dir="${ant_apk_path}"/>
+        <property name="out.packaged.file" location="${ant_apk_path}/Rsperm_${ant_packagename}_v${version}_unsigned.apk" />
+        <property name="out.final.file" location="${out.absolute.dir}/${ant.project.name}-${ant_packagename}-release.apk" />
+        <property name="build.is.mode.set" value="true" />
+
+        <property name="build.target" value="release" />
+
+        <property name="build.is.instrumented" value="false" />
+
+        <xpath input="${manifest.abs.file}" expression="/manifest/application/@android:debuggable"
+                output="build.is.packaging.debug" default="false"/>
+
+        <property name="build.is.signing.debug" value="false" />
+
+        <property name="renderscript.opt.level" value="${renderscript.release.opt.level}" />
+
+        <if condition="${build.is.packaging.debug}">
+            <else>
+                <property name="build.is.mode.release" value="true"/>
+            </else>
+        </if>
+    </target>
+	
+	<!-- Build File .d 파일 삭제 -->
+	<target name="ant_d_delete">
+		<delete file="${ant_apk_path}/Rsperm_${ant_packagename}_v${version}_unsigned.apk.d"/>
+	</target>
+	
+	<!-- Ant Lib Download -->	
+	<target name="-ant-lib-download" >
+		
+		<if condition="${islib}">
+			<then>
+				<echo message="Library OK"/>
+			</then>
+            <else>
+                <mkdir dir="${ant_lib_path}"/>
+				<get dest="${ant_lib_path}/ant-contrib-1.0b3.jar" 
+					src="http://search.maven.org/remotecontent?filepath=ant-contrib/ant-contrib/1.0b3/ant-contrib-1.0b3.jar"/>
+            </else>
+        </if>
+		
+		<taskdef resource="net/sf/antcontrib/antlib.xml">
+			<classpath>
+				<pathelement location="${ant_lib_path}/ant-contrib-1.0b3.jar"/>
+			</classpath>
+		</taskdef>
+		
+	</target>
+	
+	<!-- Ant Lib Check -->
+	<target name="-ant-lib-check">
+		<available file="${ant_lib_path}/ant-contrib-1.0b3.jar" property="islib"/>
+	</target>
+	
+	<target name="get-version">
+		<xmlproperty file="AndroidManifest.xml"
+			prefix="themanifest"
+			collapseAttributes="true"/>
+		
+		<property name="version" value="${themanifest.manifest.android:versionName}" />
+		
+		<property name="version" value="${themanifest.manifest.android:versionName}" />
+		
+		<script language="javascript">
+			var before = project.getProperty("version");
+			project.setProperty("version", before.replaceAll(" ", ""));
+		</script>
+	</target>
+	
+	<!-- Build Start-->
+	<target name="run">
+		<loadfile property="textFile" srcfile="package_list.txt"/>
+		
+		<!-- Ant Loop Build -->
+        <for param="line" list="${textFile}" delimiter="${line.separator}">
+		  <sequential>
+			<var name="ant_packagename" unset="true"/>
+			<property name="ant_packagename" value="@{line}" />
+			<antcall target="release" />
+		  </sequential>
+		</for>
+		
+		<property name="isucces" value="true" />   
+		
+	</target>
+
+	<!-- Ant Build  -->
+	<target name="release" depends="-set-release-mode, -release-obfuscation-check, -package, clean, ant_d_delete" />
+
+	<!-- Ant Succes CallBack-->
+	<target name="park" depends="-ant-lib-check, -ant-lib-download, get-version">
+		<antcallback target="run" return="isucces"/>
+		<echo message="${isucces}"/>
+	</target>
+</project>
